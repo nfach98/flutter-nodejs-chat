@@ -27,6 +27,7 @@ dependencies:
   #view
   camera: ^0.9.4+5
   emoji_picker_flutter: ^1.0.8
+  otp_text_field: ^1.1.1
 
 dev_dependencies:
   flutter_test:

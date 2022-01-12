@@ -1,6 +1,7 @@
 import 'package:camera/camera.dart';
 import 'package:chat/screens/camera_screen.dart';
 import 'package:chat/screens/home_screen.dart';
+import 'package:chat/screens/landing_screen.dart';
 import 'package:chat/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 

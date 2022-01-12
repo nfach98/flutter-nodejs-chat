@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "bufferutil": "^4.0.6",
     "cors": "^2.8.5",
     "express": "^4.17.2",
     "express-ws": "^5.0.2",
@@ -29,5 +30,8 @@
     "uuid": "^8.3.2",
     "websocket": "^1.0.34",
     "ws": "^8.4.0"
+  },
+  "engines": {
+    "node": "14.x"
   }
 }

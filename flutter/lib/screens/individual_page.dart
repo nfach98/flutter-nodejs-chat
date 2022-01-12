@@ -43,7 +43,7 @@ class _IndividualPageState extends State<IndividualPage> {
 
   void connect() {
     socket = IO.io(
-      "http://192.168.76.176:5000",
+      "https://glacial-anchorage-36266.herokuapp.com",
       <String, dynamic> {
         "transports": ["websocket"],
         "autoConnect": false,

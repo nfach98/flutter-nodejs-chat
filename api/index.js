@@ -30,6 +30,10 @@ io.on("connection", (socket) => {
 	});
 });
 
+app.route("/check").get((req, res) => {
+	return res.json("Your App is working fine");
+});
+
 server.listen(port, "0.0.0.0", () => {
 	console.log("server started");
 })
