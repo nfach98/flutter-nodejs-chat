@@ -1,0 +1,33 @@
+{
+  "name": "chat_api",
+  "version": "1.0.0",
+  "description": "API for chat",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index",
+    "dev": "nodemon index",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Nino Fachrurozy",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.17.2",
+    "express-ws": "^5.0.2",
+    "fastify": "^3.25.3",
+    "fs": "0.0.1-security",
+    "http": "0.0.1-security",
+    "jsonwebtoken": "^8.5.1",
+    "mongoose": "^6.1.6",
+    "mysql": "^2.18.1",
+    "mysql2": "^2.3.3",
+    "net": "^1.0.2",
+    "nodemon": "^2.0.15",
+    "socket.io": "^2.3.0",
+    "socket.io-client": "^2.3.0",
+    "uuid": "^8.3.2",
+    "websocket": "^1.0.34",
+    "ws": "^8.4.0"
+  }
+}
