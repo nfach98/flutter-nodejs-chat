@@ -1,9 +1,10 @@
-import 'package:chat/model/message_model.dart';
+
+import 'package:chat/layers/domain/entities/message.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class ReplyMessageCard extends StatelessWidget {
-  final MessageModel message;
+  final Message message;
 
   const ReplyMessageCard({Key? key, required this.message}) : super(key: key);
 
@@ -33,7 +34,7 @@ class ReplyMessageCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 80, 20),
                 child: Text(
-                  message.message,
+                  message.message ?? "",
                   style: TextStyle(
                       fontSize: 16
                   ),
@@ -43,7 +44,7 @@ class ReplyMessageCard extends StatelessWidget {
                 bottom: 4,
                 right: 12,
                 child: Text(
-                  DateFormat("HH:mm").format(DateTime.parse(message.time)),
+                  DateFormat("HH:mm").format(DateTime.parse(message.time ?? "")),
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],

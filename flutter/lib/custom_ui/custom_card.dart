@@ -1,5 +1,5 @@
+import 'package:chat/layers/presentation/chat/pages/chat_detail_page.dart';
 import 'package:chat/model/chat_model.dart';
-import 'package:chat/screens/individual_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -16,8 +16,8 @@ class CustomCard extends StatelessWidget {
         if (chat != null) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => IndividualPage(
-              chat: chat!,
+            MaterialPageRoute(builder: (_) => ChatDetailPage(
+              destinationChat: chat!,
               sourceChat: sourceChat,
             ))
           );

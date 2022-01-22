@@ -1,9 +1,9 @@
-import 'package:chat/model/message_model.dart';
+import 'package:chat/layers/domain/entities/message.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class OwnMessageCard extends StatelessWidget {
-  final MessageModel message;
+  final Message message;
 
   const OwnMessageCard({Key? key, required this.message}) : super(key: key);
 
@@ -34,7 +34,7 @@ class OwnMessageCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 80, 20),
                 child: Text(
-                  message.message,
+                  message.message ?? "",
                   style: TextStyle(
                     fontSize: 16
                   ),
@@ -46,7 +46,7 @@ class OwnMessageCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Text(
-                      DateFormat("HH:mm").format(DateTime.parse(message.time)),
+                      DateFormat("HH:mm").format(DateTime.parse(message.time ?? "")),
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -55,6 +55,7 @@ class OwnMessageCard extends StatelessWidget {
                     SizedBox(width: 4),
                     Icon(
                       Icons.done_all,
+                      color: message.isRead != null && message.isRead! ? Colors.blue : Colors.grey,
                       size: 20,
                     ),
                   ],

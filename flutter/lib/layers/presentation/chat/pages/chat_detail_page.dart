@@ -1,91 +1,148 @@
 import 'dart:io';
 
-import 'package:chat/custom_ui/own_message_card.dart';
-import 'package:chat/custom_ui/reply_message_card.dart';
+import 'package:chat/layers/domain/entities/message.dart';
+import 'package:chat/layers/presentation/chat/widgets/own_message_card.dart';
+import 'package:chat/layers/presentation/chat/notifiers/chat_detail_notifier.dart';
+import 'package:chat/layers/presentation/chat/widgets/reply_message_card.dart';
 import 'package:chat/model/chat_model.dart';
-import 'package:chat/model/message_model.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:chat/core/network/socket.dart';
+import 'package:provider/provider.dart';
 
-class IndividualPage extends StatefulWidget {
-  final ChatModel chat;
+class ChatDetailPage extends StatefulWidget {
+  final ChatModel destinationChat;
   final ChatModel sourceChat;
 
-  const IndividualPage({Key? key, required this.chat, required this.sourceChat}) : super(key: key);
+  const ChatDetailPage({Key? key, required this.destinationChat, required this.sourceChat}) : super(key: key);
 
   @override
-  _IndividualPageState createState() => _IndividualPageState();
+  _ChatDetailPageState createState() => _ChatDetailPageState();
 }
 
-class _IndividualPageState extends State<IndividualPage> {
-  bool isShowEmoji = false;
+class _ChatDetailPageState extends State<ChatDetailPage> with WidgetsBindingObserver {
   FocusNode focusNode = FocusNode();
-  TextEditingController _messageController = TextEditingController();
-  ScrollController _scrollController = ScrollController();
-
-  late IO.Socket socket;
-  bool isSend = false;
-
-  List<MessageModel> messages = [];
+  late TextEditingController _messageController;
+  late ScrollController _scrollController;
+  late AppLifecycleState? lastLifecycleState;
 
   @override
   void initState() {
     super.initState();
-    connect();
-    focusNode.addListener(() {
-      if (focusNode.hasFocus) {
-        setState(() => isShowEmoji = false);
-      }
-    });
-  }
+    WidgetsBinding.instance?.addObserver(this);
 
-  void connect() {
-    socket = IO.io(
-      "https://glacial-anchorage-36266.herokuapp.com",
-      <String, dynamic> {
-        "transports": ["websocket"],
-        "autoConnect": false,
-      }
-    );
-    socket.connect();
-    socket.emit("signin", widget.sourceChat.id);
-    socket.onConnect((data) {
-      socket.on("message", (msg) {
-        setMessage(type: "destination", message: msg["message"]);
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeOut
-        );
+    _messageController = TextEditingController();
+    _scrollController = ScrollController();
+
+    WidgetsBinding.instance!.addPostFrameCallback((timeStamp) {
+      context.read<ChatDetailNotifier>().reset();
+      context.read<ChatDetailNotifier>().getLocalMessages(idUser: widget.destinationChat.id.toString());
+      focusNode.addListener(() {
+        if (focusNode.hasFocus) {
+          context.read<ChatDetailNotifier>().setIsShowEmoji(false);
+        }
       });
     });
   }
 
-  void sendMessage({required String message, required int idSender, required int idReceiver}) {
-    setMessage(type: "source", message: message);
-    socket.emit("message", {
+  @override
+  void dispose() {
+    WidgetsBinding.instance?.removeObserver(this);
+    offline();
+
+    _messageController.dispose();
+    _scrollController.dispose();
+    focusNode.dispose();
+
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    setState(() {
+      lastLifecycleState = state;
+      if (state == AppLifecycleState.resumed) {
+        online();
+      }
+      else {
+        offline();
+      }
+    });
+  }
+
+  @override
+  Future<bool> didPopRoute() async {
+    offline();
+    return false;
+  }
+
+  void online() {
+    Socket.socket?.emit("online", widget.sourceChat.id);
+  }
+
+  void offline() {
+    Socket.socket?.emit("offline", widget.sourceChat.id);
+  }
+
+  void sendMessage({required String message, required List<Message> list, required int idSender, required int idReceiver}) {
+    setMessage(
+      id: "${widget.sourceChat.id}_${DateTime.now().toString()}",
+      type: "source",
+      message: message,
+      messages: list
+    );
+    Socket.socket?.emit("message", {
       "message" : message,
       "idSender" : idSender,
       "idReceiver" : idReceiver
     });
     _messageController.clear();
     focusNode.unfocus();
-    setState(() => isSend = false);
+    context.read<ChatDetailNotifier>().setIsSend(false);
   }
 
-  void setMessage({required String type, required String message}) {
-    MessageModel messageModel = MessageModel(
+  void setMessage({required String id, required String type, required String message, required List<Message> messages, bool? isRead}) {
+    Message messageModel = Message(
+      id: id,
       type: type,
       message: message,
-      time: DateTime.now().toString()
+      isRead: isRead,
+      time: DateTime.now().toString(),
     );
-    setState(() => messages.add(messageModel));
+    messages.add(messageModel);
+    List<Message> list = List.from(messages);
+    context.read<ChatDetailNotifier>().setMessages(list);
+    context.read<ChatDetailNotifier>().addLocalMessage(
+      id: messageModel.id,
+      type: messageModel.type,
+      idUser: widget.destinationChat.id.toString(),
+      message: messageModel.message,
+      time: messageModel.time,
+      isRead: messageModel.isRead,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    online();
+
+    final listonline = context.select((ChatDetailNotifier n) => n.online);
+    final messages = context.select((ChatDetailNotifier n) => n.messages);
+
+    final isSend = context.select((ChatDetailNotifier n) => n.isSend);
+    final isShowEmoji = context.select((ChatDetailNotifier n) => n.isShowEmoji);
+    final isScrollToEnd = context.select((ChatDetailNotifier n) => n.isScrollToEnd);
+
+    // if (isScrollToEnd && _scrollController.hasClients) {
+    //   _scrollController.animateTo(
+    //     _scrollController.position.maxScrollExtent,
+    //     duration: const Duration(milliseconds: 300),
+    //     curve: Curves.easeOut
+    //   );
+    //   if(mounted) context.read<ChatDetailNotifier>().setIsScrollToEnd(false);
+    // }
+
     return Stack(
       children: [
         Image.asset(
@@ -129,21 +186,21 @@ class _IndividualPageState extends State<IndividualPage> {
                 },
                 child: Container(
                   margin: EdgeInsets.symmetric(
-                    vertical: 4,
-                    horizontal: 8
+                      vertical: 4,
+                      horizontal: 8
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.chat.name ?? "",
+                        widget.destinationChat.name ?? "",
                         style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold
                         ),
                       ),
-                      Text(
-                        "last seen today at 12:05",
+                      if (listonline.toString().contains(widget.destinationChat.id.toString())) Text(
+                        "Online",
                         style: TextStyle(
                           fontSize: 12,
                         ),
@@ -207,7 +264,7 @@ class _IndividualPageState extends State<IndividualPage> {
             child: WillPopScope(
               onWillPop: () {
                 if (isShowEmoji) {
-                  setState(() => isShowEmoji = false);
+                  context.read<ChatDetailNotifier>().setIsShowEmoji(false);
                 }
                 else {
                   Navigator.pop(context);
@@ -224,7 +281,7 @@ class _IndividualPageState extends State<IndividualPage> {
                       itemCount: messages.length + 1,
                       itemBuilder: (_, index) {
                         if (index == messages.length) {
-                          return SizedBox(height: 60);
+                          return const SizedBox(height: 60);
                         }
                         if (messages[index].type == "source") {
                           return OwnMessageCard(message: messages[index]);
@@ -235,7 +292,6 @@ class _IndividualPageState extends State<IndividualPage> {
                     ),
                   ),
                   Container(
-                    height: 60,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -257,51 +313,51 @@ class _IndividualPageState extends State<IndividualPage> {
                                     minLines: 1,
                                     onChanged: (value) {
                                       if (value.isNotEmpty) {
-                                        setState(() => isSend = true);
+                                        context.read<ChatDetailNotifier>().setIsSend(true);
                                       }
                                       else {
-                                        setState(() => isSend = false);
+                                        context.read<ChatDetailNotifier>().setIsSend(false);
                                       }
                                     },
                                     decoration: InputDecoration(
-                                      border: InputBorder.none,
-                                      hintText: "Type a message",
-                                      prefixIcon: IconButton(
-                                        icon: Icon(
-                                          Icons.emoji_emotions,
+                                        border: InputBorder.none,
+                                        hintText: "Type a message",
+                                        prefixIcon: IconButton(
+                                          icon: Icon(
+                                            Icons.emoji_emotions,
+                                          ),
+                                          onPressed: () {
+                                            focusNode.unfocus();
+                                            focusNode.canRequestFocus = false;
+                                            context.read<ChatDetailNotifier>().setIsShowEmoji(!isShowEmoji);
+                                          },
                                         ),
-                                        onPressed: () {
-                                          focusNode.unfocus();
-                                          focusNode.canRequestFocus = false;
-                                          setState(() => isShowEmoji = !isShowEmoji);
-                                        },
-                                      ),
-                                      suffixIcon: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: Icon(
-                                              Icons.attach_file,
-                                            ),
-                                            onPressed: () {
-                                              showModalBottomSheet(
+                                        suffixIcon: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: Icon(
+                                                Icons.attach_file,
+                                              ),
+                                              onPressed: () {
+                                                showModalBottomSheet(
                                                   backgroundColor: Colors.transparent,
                                                   context: context,
                                                   builder: (_) => bottomSheet()
-                                              );
-                                            },
-                                          ),
-                                          IconButton(
-                                            icon: Icon(
-                                              Icons.camera_alt,
+                                                );
+                                              },
                                             ),
-                                            onPressed: () {
+                                            IconButton(
+                                              icon: Icon(
+                                                Icons.camera_alt,
+                                              ),
+                                              onPressed: () {
 
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                      contentPadding: EdgeInsets.all(4)
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        contentPadding: EdgeInsets.all(4)
                                     ),
                                   )
                               ),
@@ -320,13 +376,14 @@ class _IndividualPageState extends State<IndividualPage> {
                                     if (isSend) {
                                       _scrollController.animateTo(
                                         _scrollController.position.maxScrollExtent,
-                                        duration: Duration(milliseconds: 300),
+                                        duration: const Duration(milliseconds: 300),
                                         curve: Curves.easeOut
                                       );
                                       sendMessage(
                                         message: _messageController.text,
+                                        list: messages,
                                         idSender: widget.sourceChat.id ?? 0,
-                                        idReceiver: widget.chat.id ?? 0
+                                        idReceiver: widget.destinationChat.id ?? 0
                                       );
                                     }
                                   },
@@ -352,30 +409,30 @@ class _IndividualPageState extends State<IndividualPage> {
     return Container(
       height: MediaQuery.of(context).size.height * .3,
       child: EmojiPicker(
-        config: Config(
-          columns: 7,
-          emojiSizeMax: 32 * (Platform.isIOS ? 1.30 : 1.0),
-          verticalSpacing: 0,
-          horizontalSpacing: 0,
-          initCategory: Category.RECENT,
-          bgColor: Color(0xFFF2F2F2),
-          indicatorColor: Colors.blue,
-          iconColor: Colors.grey,
-          iconColorSelected: Colors.blue,
-          progressIndicatorColor: Colors.blue,
-          showRecentsTab: true,
-          recentsLimit: 28,
-          noRecentsText: "No Recents",
-          noRecentsStyle: const TextStyle(fontSize: 20, color: Colors.black26),
-          tabIndicatorAnimDuration: kTabScrollDuration,
-          categoryIcons: const CategoryIcons(),
-          buttonMode: ButtonMode.MATERIAL
-        ),
-        onEmojiSelected: (category, emoji) {
-          setState(() {
-            _messageController.text = _messageController.text + emoji.emoji;
-          });
-        }
+          config: Config(
+              columns: 7,
+              emojiSizeMax: 32 * (Platform.isIOS ? 1.30 : 1.0),
+              verticalSpacing: 0,
+              horizontalSpacing: 0,
+              initCategory: Category.RECENT,
+              bgColor: Color(0xFFF2F2F2),
+              indicatorColor: Colors.blue,
+              iconColor: Colors.grey,
+              iconColorSelected: Colors.blue,
+              progressIndicatorColor: Colors.blue,
+              showRecentsTab: true,
+              recentsLimit: 28,
+              noRecentsText: "No Recents",
+              noRecentsStyle: const TextStyle(fontSize: 20, color: Colors.black26),
+              tabIndicatorAnimDuration: kTabScrollDuration,
+              categoryIcons: const CategoryIcons(),
+              buttonMode: ButtonMode.MATERIAL
+          ),
+          onEmojiSelected: (category, emoji) {
+            setState(() {
+              _messageController.text = _messageController.text + emoji.emoji;
+            });
+          }
       ),
     );
   }
@@ -388,8 +445,8 @@ class _IndividualPageState extends State<IndividualPage> {
         margin: EdgeInsets.all(20),
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 20
+              horizontal: 12,
+              vertical: 20
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -398,19 +455,19 @@ class _IndividualPageState extends State<IndividualPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   iconFile(
-                    icon: Icons.insert_drive_file,
-                    color: Colors.indigo,
-                    text: "Document"
+                      icon: Icons.insert_drive_file,
+                      color: Colors.indigo,
+                      text: "Document"
                   ),
                   iconFile(
-                    icon: Icons.camera_alt,
-                    color: Colors.pink,
-                    text: "Camera"
+                      icon: Icons.camera_alt,
+                      color: Colors.pink,
+                      text: "Camera"
                   ),
                   iconFile(
-                    icon: Icons.insert_photo,
-                    color: Colors.purple,
-                    text: "Gallery"
+                      icon: Icons.insert_photo,
+                      color: Colors.purple,
+                      text: "Gallery"
                   ),
                 ],
               ),
@@ -457,7 +514,7 @@ class _IndividualPageState extends State<IndividualPage> {
         Text(
           text,
           style: TextStyle(
-            fontSize: 12
+              fontSize: 12
           ),
         )
       ],
