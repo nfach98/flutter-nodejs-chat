@@ -18,15 +18,21 @@ var clients = {};
 
 io.on("connection", (socket) => {
 	console.log("connected");
-	socket.on("signin", (id) => {
+	socket.on("online", (id) => {
 		console.log(id);
 		clients[id] = socket;
+		clients[id].emit("online", Object.keys(clients));
 	});
 
 	socket.on("message", (msg) => {
-		console.log(msg);
+		// console.log(msg);
 		let idReceiver = msg.idReceiver;
 		if (clients[idReceiver]) clients[idReceiver].emit("message", msg);
+	});
+
+	socket.on("offline", (id) => {
+		delete clients[id];
+		console.log(Object.keys(clients));
 	});
 });
 
